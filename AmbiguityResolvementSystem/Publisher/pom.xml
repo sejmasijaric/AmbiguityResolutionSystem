@@ -4,37 +4,72 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- Inherit from Spring Boot starter parent -->
     <parent>
-        <groupId>org.example</groupId>
-        <artifactId>AmbiguityResolvementSystem</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.4</version>
+        <relativePath/> <!-- If it's not in parent dir, you can remove this line -->
     </parent>
 
+    <groupId>org.example</groupId>
     <artifactId>Publisher</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
     <dependencies>
+        <!-- Your local modules -->
         <dependency>
             <groupId>org.example</groupId>
             <artifactId>MachineLearning</artifactId>
             <version>1.0-SNAPSHOT</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.eclipse.paho</groupId>
-            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-            <version>1.2.5</version>
-        </dependency>
-        <dependency>
-            <groupId>org.deckfour</groupId>
-            <artifactId>xes</artifactId>
-            <version>2.0.3</version>
-            <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.example</groupId>
             <artifactId>AmbiguityDetection</artifactId>
             <version>1.0-SNAPSHOT</version>
-            <scope>compile</scope>
+        </dependency>
+
+        <!-- MQTT client -->
+        <dependency>
+            <groupId>org.eclipse.paho</groupId>
+            <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+            <version>1.2.5</version>
+        </dependency>
+
+        <!-- OpenXES for XES parsing -->
+        <dependency>
+            <groupId>org.deckfour</groupId>
+            <artifactId>xes</artifactId>
+            <version>2.0.3</version>
+        </dependency>
+
+        <!-- Spring Boot core -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- For @Component and @PostConstruct -->
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+            <version>1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.10.1</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <!-- Spring Boot plugin for running the app -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

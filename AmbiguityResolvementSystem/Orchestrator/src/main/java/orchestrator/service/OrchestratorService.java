@@ -1,6 +1,7 @@
 package orchestrator.service;
 
 import org.deckfour.xes.model.XEvent;
+import org.deckfour.xes.model.impl.XEventImpl;
 import org.springframework.stereotype.Service;
 import publisherpackage.EventStreamListener;
 import ambiguitypackage.AmbiguityDetection;
@@ -32,10 +33,48 @@ public class OrchestratorService {
     MLClient mlClient = new MLClient();
     private final List<XEvent> receivedEvents = new ArrayList<>();
 
-
     public void processEvent(String xesEvent) {
         XEvent xevent = streamListener.parseXesEvent(xesEvent);
-        if (receivedEvents )
+        if (receivedEvents.size() >= 6){
+            receivedEvents.remove(0); // remove the oldest event
+        }
+        receivedEvents.add(xevent); // add the new event
+        try {
+            if (ambiguityDetection.isAmbiguous(receivedEvents)) {
+                System.out.println("Ambiguous events detected, triggering ambiguity resolution...");
+                cameraClient.startCamera();
+                cameraClient.captureFrame();
+                String mlOutput;
+                while (true) {
+                    for (int i = 0; i <= 4; i++) {
+                        cameraClient.captureFrame();
+                        cameraClient.wait(500);
+                    }
+                    mlOutput = mlClient.analyzeFrames();
+                    // Check if the ML model resolved the ambiguity
+                    if (mlOutput != null && mlClient.isResolvedAmbiguity()) {
+                        System.out.println("ML output: " + mlOutput);
+                        break;
+                    } else {
+                        System.out.println("Ambiguity not resolved, retrying...");
+                    }
+                }
+                // Split output to get the top class --> top class will be splitOutput[1]
+                String[] splitOutput = mlOutput.split(",")[0].split(":");
+
+                // TODO: what to do with the multiple events that are ambiguous --> only one event can be published
+                // TODO: create a new event with the top class and publish it
+                // delete the ambiguous events from the list and leave only the new event with the resolved ambiguity
+                XEvent eventToPublish = new XEventImpl();
+
+
+            } else {
+                System.out.println("No ambiguous event detected, triggering publisher...");
+                // TODO: shouldi re-trigger the published and republish non-ambiguous events or just print the message
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }
 

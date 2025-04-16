@@ -1,5 +1,3 @@
-
-// In Notizen: Schwierigkeiten die aufgetaucht sind
 /*
 * This module needs to:
 * 1. listen to stream of events
@@ -17,9 +15,8 @@ import org.deckfour.xes.extension.std.XTimeExtension;
 import org.deckfour.xes.model.XEvent;
 
 import java.time.Instant;
-
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
+
 import java.util.List;
 
 public class AmbiguityDetection {
@@ -37,22 +34,16 @@ public class AmbiguityDetection {
         // loop through the list of timestamps
         for (int i = 0; i < events.size() - 1; i++) {
             // Compare the current timestamp with the next one
-                Instant t1 = XTimeExtension.instance().extractTimestamp(events.get(i)).toInstant();
-                Instant t2 = XTimeExtension.instance().extractTimestamp(events.get(i + 1)).toInstant();
-                // Check timestamp difference in milliseconds
-                long differenceInMilliseconds = ChronoUnit.MILLIS.between(t1, t2);
+            Instant t1 = XTimeExtension.instance().extractTimestamp(events.get(i)).toInstant();
+            Instant t2 = XTimeExtension.instance().extractTimestamp(events.get(i + 1)).toInstant();
+            // Check timestamp difference in milliseconds
+            long differenceInMilliseconds = ChronoUnit.MILLIS.between(t1, t2);
 
-                if (differenceInMilliseconds < AMBIGUITY_THRESHOLD) {
-                    System.out.println("Ambiguous events detected between: " + t1 + " and " + t2);
-                    return true; // Ambiguous events found
+            if (differenceInMilliseconds < AMBIGUITY_THRESHOLD) {
+                System.out.println("Ambiguous events detected between: " + t1 + " and " + t2);
+                return true; // Ambiguous events found
             }
         }
         return false;
-    }
-    public void triggerOrchestrator() {
-        // Trigger orchestrator logic
-    }
-    public void triggerPublisher() {
-        // Trigger publisher logic
     }
 }

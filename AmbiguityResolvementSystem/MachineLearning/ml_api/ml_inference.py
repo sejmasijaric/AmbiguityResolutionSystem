@@ -11,9 +11,11 @@ frames_folder_path = str(pathlib.Path(__file__).parent.resolve()) + "/captured_f
 
 # Reference: https://stackoverflow.com/questions/50504315/finding-latest-file-in-a-folder-using-python
 def get_most_recent_frame():
-    newest_file_path = max(glob.glob(frames_folder_path), key=os.path.getmtime) # finds the newest file in the folder
-    return os.path.basename(newest_file_path)
-
+    # newest_file_path = max(glob.glob(frames_folder_path), key=os.path.getmtime) # finds the newest file in the folder
+    # return os.path.basename(newest_file_path)
+    frame_file_paths = sorted(glob.glob(frames_folder_path), key=os.path.getmtime, reverse=True)
+    number_of_frame_paths = 4
+    return frame_file_paths[:number_of_frame_paths]
 
 def model_inference ():
     # return model(get_most_recent_frame())
@@ -31,16 +33,23 @@ def format_model_output(results):
     if not results:
         return {"error": "Empty result"}
 
-    result = results[0]
+    all_probabilities = []
+    image_paths = []
 
-    if not hasattr(result, "probs") or result.probs is None:
-        return {"error": "No probabilities returned by the model"}
+    for result in results: 
+        if not hasattr(result, "probs") or result.probs is None:
+            print("No probability returned by the model")
+            continue
+        image_paths.append(result.path)
+        all_probabilities.append(result.probs.data.tolist())
 
-    probs = result.probs.data.tolist()
-    names = result.names
+    if not all_probabilities:
+        return {"error": "No valid probabilities returned by model!"}
 
+    avg_prob = np.mean(all_probabilities, axis=0)
+    class_names = results[0].names
     class_probs = {
-        names[i]: float(prob) for i, prob in enumerate(probs)
+        class_names[i]: float(prob) for i, prob in enumerate(avg_prob)
     }
 
     top_class = max(class_probs, key=class_probs.get)
@@ -50,19 +59,23 @@ def format_model_output(results):
         "top_class": top_class,
         "confidence": top_confidence,
         "all_class_probabilities": class_probs,
-        "image_path": result.path
+        "image_paths": image_paths
     }
 
-def get_random_frame():
+def get_random_frame(n=4):
     # Assuming test frames are in 'test_frames' folder next to this script
     test_frames_path = "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/*.jpg"
 
-    frame_files = glob.glob(test_frames_path)
+    #frame_files = glob.glob(test_frames_path)
+    frame_files = sorted(glob.glob(test_frames_path), key=os.path.getmtime, reverse=True)
+
 
     if not frame_files:
         print("No test frames found.")
         return None
-
-    random_frame = random.choice(frame_files)
-    print("\n\nRandomly selected frame:", random_frame)
-    return random_frame
+    
+    selected_frames = frame_files[:4]
+    print("\n\Selected test frames:", )
+    for frame in selected_frames:
+        print(selected_frames)
+    return selected_frames

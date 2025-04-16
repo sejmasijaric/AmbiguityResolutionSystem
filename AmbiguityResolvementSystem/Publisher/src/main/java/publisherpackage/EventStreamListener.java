@@ -5,58 +5,104 @@ import org.deckfour.xes.model.XEvent;
 import org.eclipse.paho.client.mqttv3.*;
 
 import java.io.ByteArrayInputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import ambiguitypackage.AmbiguityDetection;
+import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
+import org.springframework.stereotype.Component;
+
+import javax.annotation.PostConstruct;
 
 /*
 * This module needs to:
 * 1. Connect to the broker
 * 2. Listen to stream of events
-* 3.
+* 3. Convert from format to format --> as required
+* 4. Send the event to orchestrator
+* 5. Publish event via MQTT when needed
 * */
 
 // Using Eclipse Paho MQTT and OpenXES library
 // Class for listening to MQTT events and processing them
 
 // Reference: https://www.emqx.com/en/blog/how-to-use-mqtt-in-java
+@Component
 public class EventStreamListener {
-
-    private List<XEvent> receivedEvents = new ArrayList<>();
-    private AmbiguityDetection ambiguityDetection = new AmbiguityDetection();
-    String broker = "tcp://broker.emqx.io:1883";
-    String clientId = "demo_client";
+    private static final String BASE_URL = "http://localhost:8080";
+    public final String broker = "tcp://broker.emqx.io:1883";
     String topic = "topic/test";
-    MqttClient client;
-
-    public void connectToBroker() {
+    public void connectToBroker(String clientId) {
         try {
-            this.client = new MqttClient(broker, clientId);
+            MqttClient client = new MqttClient(broker, clientId);
             MqttConnectOptions options = new MqttConnectOptions();
             client.connect(options);
         } catch (MqttException e) {
             e.printStackTrace();
         }
     }
-    public void consumeEvents() {
+    public void sendEventToOrchestrator(String newStringEvent) throws Exception {
+        String request = "/orchestrate/new-event";
+        URI url = new URI(BASE_URL + request);
+        HttpURLConnection connection = (HttpURLConnection) url.toURL().openConnection();
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/xml");
+        connection.setDoOutput(true); // there will be data in the body of the request
 
+        // Write the event to the request body
+        try (OutputStream outputStream = connection.getOutputStream()) {
+            byte[] input = newStringEvent.getBytes(StandardCharsets.UTF_8);
+            outputStream.write(input, 0, input.length);
+        }
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            System.out.println("Event sent to orchestrator successfully.");
+        } else {
+            System.out.println("Failed to send event to orchestrator. Response code: " + responseCode);
+        }
+
+        connection.disconnect();
+
+    }
+
+    @PostConstruct
+    public void startListener() {
+        Thread listenerThread = new Thread(() -> {
+            try {
+                consumeEvents();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+        listenerThread.setDaemon(false);
+        listenerThread.start();
+        System.out.println("Listening to events...");
+    }
+    public void consumeEvents() {
         try {
+            MqttClient client = new MqttClient(broker, "subscriber", new MemoryPersistence());
+            MqttConnectOptions options = new MqttConnectOptions();
+            client.connect(options);
+
             if (client.isConnected()) {
                 System.out.println("Connected to MQTT broker!");
                 client.setCallback(new MqttCallback() {
                     public void messageArrived(String topic, MqttMessage message) throws Exception {
                         String payload = new String(message.getPayload());
                         System.out.println("Message received: " + payload);
+                        System.out.println("This here is printeeedèèèè");
 
                         // since every message indicates a new event, we need to process it and check for ambiguity!
                         XEvent event = parseXesEvent(payload);
-                        if (event != null) {
-                            processEvent(event);
-                        }
+                        // TODO: the whole http part and sending this message to orchestrator via http
+                        String stringEvent = prepareMessage(event);
+                        sendEventToOrchestrator(stringEvent);
                     }
                     public void connectionLost(Throwable cause) {
-                        System.out.println("connectionLost: " + cause.getMessage());
+                        System.out.println("Connection lost! " + cause.getMessage());
                     }
 
                     public void deliveryComplete(IMqttDeliveryToken token) {
@@ -65,13 +111,23 @@ public class EventStreamListener {
                 });
 
                 client.subscribe(topic, 1);
+                synchronized (this) {
+                    try {
+                        this.wait();
+                    } catch (InterruptedException e) {
+                        System.out.println("Listener thread interrupted: " + e.getMessage());
+                    }
+                }
             }
 
         } catch (MqttException e) {
             e.printStackTrace();
         }
     }
-    public void publishEvents (XEvent event) {
+    public void publishEvent (XEvent event) throws MqttException {
+        MqttClient client = new MqttClient(broker, "publisher", new MemoryPersistence());
+        MqttConnectOptions options = new MqttConnectOptions();
+        client.connect(options);
         String message = prepareMessage(event);
         try {
             if (client.isConnected()) {
@@ -116,7 +172,8 @@ public class EventStreamListener {
         message = message + "</event>";
         return message;
     }
-    private XEvent parseXesEvent(String xml) {
+
+    public XEvent parseXesEvent(String xml) {
         try {
             String wrappedXml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<log>\n<trace>\n" + xml + "\n</trace>\n</log>";
             ByteArrayInputStream input = new ByteArrayInputStream(wrappedXml.getBytes(StandardCharsets.UTF_8));
@@ -128,19 +185,6 @@ public class EventStreamListener {
             return null;
         }
     }
-    private void processEvent(XEvent event) {
-        if (receivedEvents.size() >= 6) {
-            // Remove the oldest event if the list exceeds 100 events
-            receivedEvents.remove(0);
-        }
-        receivedEvents.add(event);
-        // TODO: Separate concerns -> checking for ambiguity should be done in orchestrator!!!
-        if (ambiguityDetection.isAmbiguous(receivedEvents)) {
-            System.out.println("Ambiguous events detected, triggering orchestrator...");
-            ambiguityDetection.triggerOrchestrator();
-        } else {
-            System.out.println("No ambiguity detected, triggering publisher...");
-            ambiguityDetection.triggerPublisher();
-        }
-    }
+
+
 }

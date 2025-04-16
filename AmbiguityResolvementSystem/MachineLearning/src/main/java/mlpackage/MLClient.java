@@ -1,5 +1,8 @@
 package mlpackage;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -7,9 +10,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-public class MLClient {
 
-    public static final String BASE_URL = "http://localhost:8001";
+public class MLClient {
+    private static final String BASE_URL = "http://localhost:8001";
+    private static final double CONFIDENCE_THRESHOLD = 0.95;
+    private boolean resolvedAmbiguity;
 
     public String analyzeFrames () throws URISyntaxException, IOException {
         String request = "/analyze-frames";
@@ -32,11 +37,21 @@ public class MLClient {
         }
         response.close();
 
-        if (responseCode == 200) {
-            return "Success:" + responseString;
-        } else {
-            return "Error (" + responseCode + "): " + responseString.toString();
-        }
+        // Parse the JSON response
+        // Reference: https://www.baeldung.com/jackson-object-mapper-tutorial
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(responseString.toString());
+        JsonNode resultNode = jsonNode.path("result");
+
+        String topClass = resultNode.path("top_class").asText();
+        double confidence = resultNode.path("confidence").asDouble();
+
+        resolvedAmbiguity = confidence >= CONFIDENCE_THRESHOLD;
+
+        return "Top class: " + topClass + ", Confidence: " + confidence + ", Resolved Ambiguity: " + resolvedAmbiguity;
+    }
+    public boolean isResolvedAmbiguity() {
+        return resolvedAmbiguity;
     }
 
     public static void main(String[] args) throws URISyntaxException, IOException {
