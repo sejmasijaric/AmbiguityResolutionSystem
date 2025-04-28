@@ -1,12 +1,16 @@
 package orchestrator.service;
 
+import camerapackage.CameraServiceClient;
+import mlpackage.MLServiceClient;
 import org.deckfour.xes.model.XEvent;
 import org.deckfour.xes.model.impl.XEventImpl;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import publisherpackage.EventStreamListener;
 import ambiguitypackage.AmbiguityDetection;
-import camerapackage.CameraClient;
-import mlpackage.MLClient;
+import camerapackage.CameraServiceClientImpl;
+import mlpackage.MLServiceClientImpl;
+import publisherpackage.PublishingServiceClient;
 
 
 import java.util.ArrayList;
@@ -27,38 +31,39 @@ This service does the following:
 @Service
 public class OrchestratorService {
 
-    EventStreamListener streamListener = new EventStreamListener();
+    @Autowired
+    public OrchestratorService(CameraServiceClient cameraClient, MLServiceClient mlClient, PublishingServiceClient publishingClient) {
+        this.cameraClient = cameraClient;
+        this.mlClient = mlClient;
+        this.publishingClient = publishingClient;
+    }
     AmbiguityDetection ambiguityDetection = new AmbiguityDetection();
-    CameraClient cameraClient = new CameraClient();
-    MLClient mlClient = new MLClient();
+    CameraServiceClient cameraClient;
+    MLServiceClient mlClient;
+    PublishingServiceClient publishingClient;
     private final List<XEvent> receivedEvents = new ArrayList<>();
 
     public void processEvent(String xesEvent) {
-        XEvent xevent = streamListener.parseXesEvent(xesEvent);
-        if (receivedEvents.size() >= 6){
-            receivedEvents.remove(0); // remove the oldest event
-        }
-        receivedEvents.add(xevent); // add the new event
+
+        // TODO: remove additional responsibilities -> orch does only data flow orchestration
+        //XEvent xevent = streamListener.parseXesEvent(xesEvent);
+
         try {
             if (ambiguityDetection.isAmbiguous(receivedEvents)) {
                 System.out.println("Ambiguous events detected, triggering ambiguity resolution...");
-                cameraClient.startCamera();
-                cameraClient.captureFrame();
-                String mlOutput;
-                while (true) {
-                    for (int i = 0; i <= 4; i++) {
-                        cameraClient.captureFrame();
-                        cameraClient.wait(500);
-                    }
-                    mlOutput = mlClient.analyzeFrames();
-                    // Check if the ML model resolved the ambiguity
-                    if (mlOutput != null && mlClient.isResolvedAmbiguity()) {
-                        System.out.println("ML output: " + mlOutput);
-                        break;
-                    } else {
-                        System.out.println("Ambiguity not resolved, retrying...");
-                    }
+                String mlOutput = cameraClient.captureFrame();
+
+
+                // Check if the ML model resolved the ambiguity
+                if (mlOutput != null) {
+                    System.out.println("ML output: " + mlOutput);
+                    // TODO: add here the new xevent format for example with the resolved ambiguity
+                    publishingClient.publishMessage(mlOutput);
+                } else {
+                    // add an additional attr with label confidences -> if conf is less that threshold someone should take a manual look at it
+                    System.out.println("Ambiguity not resolved. Manual intervention needed on event: {}");
                 }
+
                 // Split output to get the top class --> top class will be splitOutput[1]
                 String[] splitOutput = mlOutput.split(",")[0].split(":");
 
@@ -70,6 +75,7 @@ public class OrchestratorService {
 
             } else {
                 System.out.println("No ambiguous event detected, triggering publisher...");
+                publishingClient.publishMessage(xesEvent);
                 // TODO: shouldi re-trigger the published and republish non-ambiguous events or just print the message
             }
         } catch (Exception e) {
