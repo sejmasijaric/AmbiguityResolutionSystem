@@ -4,18 +4,49 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import org.springframework.stereotype.Service;
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
-public class MLClient {
+
+@Service
+public class MLServiceClientImpl implements MLServiceClient {
     private static final String BASE_URL = "http://localhost:8001";
     private static final double CONFIDENCE_THRESHOLD = 0.95;
     private boolean resolvedAmbiguity;
+    private Process pythonServerProcess;
 
+    @PostConstruct
+    public void startMlServer () throws IOException {
+        // Start the Python server
+        ProcessBuilder processBuilder = new ProcessBuilder(
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/venv/bin/python3", "-m", "uvicorn", "ml_api:service", "--host", "0.0.0.0", "--port", "8001"
+        );
+        processBuilder.redirectErrorStream(true);
+        pythonServerProcess = processBuilder.start();
+
+        try{
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    @PreDestroy
+    public void stopMlServer () {
+        if (pythonServerProcess != null && pythonServerProcess.isAlive()) {
+            pythonServerProcess.destroy();
+        }
+    }
+
+    @Override
     public String analyzeFrames () throws URISyntaxException, IOException {
         String request = "/analyze-frames";
         URI url = new URI(BASE_URL + request);
@@ -50,13 +81,20 @@ public class MLClient {
 
         return "Top class: " + topClass + ", Confidence: " + confidence + ", Resolved Ambiguity: " + resolvedAmbiguity;
     }
+
+
     public boolean isResolvedAmbiguity() {
         return resolvedAmbiguity;
     }
 
     public static void main(String[] args) throws URISyntaxException, IOException {
-        MLClient client = new MLClient();
-        System.out.println(client.analyzeFrames());;
+        MLServiceClientImpl client = new MLServiceClientImpl();
+        client.startMlServer();
+        System.out.println("ML server started.");
+        System.out.println(client.analyzeFrames());
+        System.out.println("ML analysis completed.");
+        client.stopMlServer();
+        System.out.println("ML server stopped.");
     }
 
 }

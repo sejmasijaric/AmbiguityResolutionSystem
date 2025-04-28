@@ -7,10 +7,17 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 import os
 from datetime import datetime 
+import yaml
+
+def load_yaml (path):
+    with open(path, "r") as f:
+        return yaml.safe_load(f)
+
+config = load_yaml("../camera-module-config.yaml")
 
 app = FastAPI()
 camera = None  # Global variable to hold camera object
-SAVE_DIR = "../../MachineLearning/ml_api/captured_frames"
+SAVE_DIR = config['camera_api']['SAVE_DIR']
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # function to start the camera
@@ -18,8 +25,8 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 def start_camera():
     global camera
 
-    if camera is not None:
-        return {"status": "already running"}
+    runif camera is not None:
+        return {"status": "already ning"}
 
     camera = cv2.VideoCapture(0)
 
@@ -51,7 +58,7 @@ def capture_frame():
     if not ret:
         return JSONResponse(status_code=500, content={"error": "Failed to read frame"})
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     filename = f"{SAVE_DIR}/frame_{timestamp}.jpg"
     cv2.imwrite(filename, frame)
 
