@@ -25,11 +25,13 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 def start_camera():
     global camera
 
-    runif camera is not None:
-        return {"status": "already ning"}
+    # check if camera is already running
+    if camera is not None:
+        return {"status": "Camera already running"}
 
     camera = cv2.VideoCapture(0)
 
+    # check if camera could start
     if not camera.isOpened():
         camera = None
         return JSONResponse(status_code=500, content={"error": "Failed to open camera"})
@@ -59,7 +61,7 @@ def capture_frame():
         return JSONResponse(status_code=500, content={"error": "Failed to read frame"})
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-    filename = f"{SAVE_DIR}/frame_{timestamp}.jpg"
-    cv2.imwrite(filename, frame)
+    filepath = f"{SAVE_DIR}/frame_{timestamp}.jpg"
+    cv2.imwrite(filepath, frame)
 
-    return {"status": "frame captured", "filename": filename}
+    return {"status": "frame captured", "filepath": filepath}

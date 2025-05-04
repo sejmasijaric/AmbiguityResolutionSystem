@@ -30,11 +30,14 @@ import javax.annotation.PostConstruct;
 // Class for listening to MQTT events and processing them
 
 // Reference: https://www.emqx.com/en/blog/how-to-use-mqtt-in-java
+// TODO: describe the reference you used (1-to-1 or adjusted..)
 @Component
 public class EventStreamListener {
     private static final String BASE_URL = "http://localhost:8080";
-    public final String broker = "tcp://broker.emqx.io:1883";
-    String topic = "topic/test";
+    private final String broker = "tcp://localhost";
+    private String topic = "topic/test";
+
+
     public void connectToBroker(String clientId) {
         try {
             MqttClient client = new MqttClient(broker, clientId);
@@ -68,6 +71,10 @@ public class EventStreamListener {
 
     }
 
+    public static void main(String[] args) {
+        EventStreamListener listener = new EventStreamListener();
+        listener.startListener();
+    }
     @PostConstruct
     public void startListener() {
         Thread listenerThread = new Thread(() -> {
@@ -142,6 +149,7 @@ public class EventStreamListener {
         }
     }
     public String prepareMessage(XEvent event) {
+        // hard coded - make more generic
         String conceptName = event.getAttributes().get("concept:name").toString();
         String timestamp = event.getAttributes().get("time:timestamp").toString();
         String location = event.getAttributes().get("location:station").toString();
