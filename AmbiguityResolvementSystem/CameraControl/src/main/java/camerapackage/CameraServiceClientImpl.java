@@ -5,8 +5,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
+import netscape.javascript.JSObject;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -26,13 +32,21 @@ public class CameraServiceClientImpl implements CameraServiceClient {
             ex.printStackTrace();
         }
         return properties;
-    }*/
+    }
+*/
 
     @Override
-    public String captureFrame() throws Exception {
+    public List<String> captureFrames() throws Exception {
         startCamera();
+        List<String> filepaths = new ArrayList<>();
+        String filepath;
         for (int i = 0; i < 5; i++) {
-            takePhoto();
+            filepath = takePhoto();
+            if (filepath.equals("Could not capture frame")) {
+                System.out.println("Failed to capture frame.");
+                continue;
+            }
+            filepaths.add(filepath);
             try {
                 Thread.sleep(500); // Wait for 500 milliseconds
             } catch (InterruptedException e) {
@@ -41,20 +55,33 @@ public class CameraServiceClientImpl implements CameraServiceClient {
             }
         }
         stopCamera();
-        return null;
+        return filepaths;
     }
 
     private void startCamera() throws IOException, URISyntaxException {
         System.out.println("Starting camera...");
         sendGetRequest("/start-camera");
+        System.out.println("Camera started!");
     }
     private void stopCamera() throws IOException , URISyntaxException{
         System.out.println("Stopping camera...");
         sendGetRequest("/stop-camera");
+        System.out.println("Camera stopped!");
     }
-    private void takePhoto() throws IOException, URISyntaxException {
-        System.out.println("Capturing frames...");
-        sendGetRequest("/capture-frame");
+    private String takePhoto() throws IOException, URISyntaxException, ParseException {
+        String response = sendGetRequest("/capture-frame");
+        JSONParser parser = new JSONParser();
+        JSONObject jsonObject = (JSONObject) parser.parse(response);
+        String status = jsonObject.get("status").toString();
+        String filepath;
+        if (status.equals("frame captured")) {
+            System.out.println("Frame captured successfully!");
+            filepath = jsonObject.get("filepath").toString();
+        } else {
+            System.out.println("Failed to capture frame.");
+            return "Could not capture frame";
+        }
+        return filepath;
     }
 
     // Helper method to send the frames
@@ -82,15 +109,17 @@ public class CameraServiceClientImpl implements CameraServiceClient {
         response.close();
 
         if (responseCode == 200) {
-            return "Success:" + responseString;
+            return responseString.toString();
         } else {
-            return "Error (" + responseCode + "): " + responseString.toString();
+            return responseString.toString();
         }
     }
 
     public static void main(String[] args) throws Exception {
         CameraServiceClientImpl cameraClient = new CameraServiceClientImpl();
-        String result = cameraClient.captureFrame();
-        System.out.println("Capture result: " + result);
+        List<String> paths = cameraClient.captureFrames();
+        for (String path : paths) {
+            System.out.println("Captured frame: " + path);
+        }
     }
 }
