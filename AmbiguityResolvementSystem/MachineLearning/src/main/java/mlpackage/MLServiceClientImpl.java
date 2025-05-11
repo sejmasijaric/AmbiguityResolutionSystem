@@ -16,43 +16,29 @@ import java.util.Map;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.stereotype.Service;
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class MLServiceClientImpl implements MLServiceClient {
-    private static final String BASE_URL = "http://localhost:8081";
-    private static final double CONFIDENCE_THRESHOLD = 0.95;
-    private boolean resolvedAmbiguity;
-    private Process pythonServerProcess;
 
-    @PostConstruct
-    public void startMlServer () throws IOException {
-        // Start the Python server
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                "/Users/sejmasijaric/Documents/Bachelor Thesis/venv/bin/python3", "-m", "uvicorn", "ml_api:service", "--host", "0.0.0.0", "--port", "8001"
-        );
-        processBuilder.redirectErrorStream(true);
-        pythonServerProcess = processBuilder.start();
+    private static final Logger logger = LoggerFactory.getLogger(MLServiceClientImpl.class);
+    // load configuration
+    ConfigLoader config = new ConfigLoader();
+    private final double CONFIDENCE_THRESHOLD = Double.parseDouble(config.get("ml.confidenceThreshold"));
 
-        try{
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    @PreDestroy
-    public void stopMlServer () {
-        if (pythonServerProcess != null && pythonServerProcess.isAlive()) {
-            pythonServerProcess.destroy();
-        }
-    }
-
+    /**
+     * This method sends a POST request with frame paths to the ML service to analyze the frames
+     * It returns the result of the analysis and whether the ambiguity was resolved (whether the classification confidence is above the threshold)
+     *
+     * @param frame_paths List of frame paths captured by the camera to be analyzed
+     * @return JSON string containing the result of the analysis, the frame paths and whether the ambiguity was resolved
+     */
     @Override
     public String analyzeFrames (List<String> frame_paths) throws URISyntaxException, IOException {
-        String request = "/analyze-frames";
+        logger.info("Sending request to ML service to analyze frames...");
+        String BASE_URL = config.get("ml.baseUrl");
+        String request = config.get("ml.requestEndpoint");
         URI url = new URI(BASE_URL + request);
         HttpURLConnection connection = (HttpURLConnection) url.toURL().openConnection();
         connection.setRequestMethod("POST");
@@ -68,9 +54,10 @@ public class MLServiceClientImpl implements MLServiceClient {
         // get response code
         int responseCode = connection.getResponseCode();
         if (responseCode != HttpURLConnection.HTTP_OK) {
+            logger.error("Failed to connect to the server. Response code: " + responseCode);
             throw new IOException("Failed to connect to the server. Response code: " + responseCode);
         }
-
+        logger.info("ML model successfully processed frames!");
         // read response
         BufferedReader response = new BufferedReader(new InputStreamReader(connection.getInputStream()));
         StringBuilder responseString = new StringBuilder();
@@ -80,35 +67,20 @@ public class MLServiceClientImpl implements MLServiceClient {
         }
         response.close();
 
-        // Parse the JSON response
+        // parse the JSON response
         // Reference: https://www.baeldung.com/jackson-object-mapper-tutorial
+        // used to convert JSON to Java objects
         JsonNode fullJson = objectMapper.readTree(responseString.toString());
         JsonNode resultNode = fullJson.path("result");
-        String result = resultNode.path("result").asText();
         double confidence = resultNode.path("confidence").asDouble();
         // Check if the confidence is above the threshold
-        resolvedAmbiguity = confidence >= CONFIDENCE_THRESHOLD;
-
+        boolean resolvedAmbiguity = confidence >= CONFIDENCE_THRESHOLD;
+        logger.info("ML model confidence: " + confidence + ". Resolved ambiguity: " + resolvedAmbiguity);
+        // Construct final JSON output including boolean indicating whether the ambiguity was resolved
         ObjectNode resultObject = (ObjectNode) resultNode;
         resultObject.put("resolved_ambiguity", resolvedAmbiguity);
-
-
-        return objectMapper.writeValueAsString(resultObject);
+        String mlOutput = objectMapper.writeValueAsString(resultObject);
+        logger.info("ML output: " + mlOutput);
+        return mlOutput;
     }
-
-    public static void main(String[] args) throws URISyntaxException, IOException {
-        MLServiceClientImpl client = new MLServiceClientImpl();
-        client.startMlServer();
-        System.out.println("ML server started.");
-        List<String> testFramePaths = Arrays.asList(
-                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0027.jpg",
-                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered8_frame_0012.jpg",
-                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered6_frame_0025.jpg"
-        );
-        System.out.println(client.analyzeFrames(testFramePaths));
-        System.out.println("ML analysis completed.");
-        client.stopMlServer();
-        System.out.println("ML server stopped.");
-    }
-
 }

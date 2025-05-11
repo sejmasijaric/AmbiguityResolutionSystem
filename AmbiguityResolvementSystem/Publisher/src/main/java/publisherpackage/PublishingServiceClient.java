@@ -1,6 +1,5 @@
 package publisherpackage;
 
-import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 
 public interface PublishingServiceClient {

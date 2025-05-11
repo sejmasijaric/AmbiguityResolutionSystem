@@ -10,7 +10,6 @@
     <packaging>pom</packaging>
 
     <modules>
-        <module>AmbiguityDetection</module>
         <module>CameraControl</module>
         <module>MachineLearning</module>
         <module>Orchestrator</module>
