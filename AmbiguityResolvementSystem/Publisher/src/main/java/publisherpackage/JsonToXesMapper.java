@@ -3,7 +3,7 @@ package publisherpackage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.stereotype.Service;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -17,6 +17,7 @@ import java.io.StringWriter;
 import java.util.Iterator;
 import java.util.Map;
 
+@Service
 public class JsonToXesMapper {
 
     public static void main (String[] args) {
