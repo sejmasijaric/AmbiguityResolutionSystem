@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 import os
 from datetime import datetime 
 import yaml
+import logging
 
 def load_yaml (path):
     with open(path, "r") as f:
@@ -54,10 +55,12 @@ def capture_frame():
     global camera
 
     if camera is None or not camera.isOpened():
+        logging.error("Camera is not started or lost connection.")
         return JSONResponse(status_code=500, content={"error": "Camera is not started"})
 
     ret, frame = camera.read()
     if not ret:
+        logging.error("Failed to read frame from camera.")
         return JSONResponse(status_code=500, content={"error": "Failed to read frame"})
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]

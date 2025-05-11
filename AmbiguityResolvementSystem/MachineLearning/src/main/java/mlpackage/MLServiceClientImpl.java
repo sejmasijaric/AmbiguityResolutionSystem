@@ -9,7 +9,6 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,9 +22,8 @@ import org.slf4j.LoggerFactory;
 public class MLServiceClientImpl implements MLServiceClient {
 
     private static final Logger logger = LoggerFactory.getLogger(MLServiceClientImpl.class);
-    // load configuration
-    ConfigLoader config = new ConfigLoader();
-    private final double CONFIDENCE_THRESHOLD = Double.parseDouble(config.get("ml.confidenceThreshold"));
+    // load mlConfiguration
+    ConfigLoader mlConfig = new ConfigLoader();
 
     /**
      * This method sends a POST request with frame paths to the ML service to analyze the frames
@@ -37,8 +35,8 @@ public class MLServiceClientImpl implements MLServiceClient {
     @Override
     public String analyzeFrames (List<String> frame_paths) throws URISyntaxException, IOException {
         logger.info("Sending request to ML service to analyze frames...");
-        String BASE_URL = config.get("ml.baseUrl");
-        String request = config.get("ml.requestEndpoint");
+        String BASE_URL = mlConfig.get("ml.baseUrl");
+        String request = mlConfig.get("ml.requestEndpoint");
         URI url = new URI(BASE_URL + request);
         HttpURLConnection connection = (HttpURLConnection) url.toURL().openConnection();
         connection.setRequestMethod("POST");
@@ -73,6 +71,7 @@ public class MLServiceClientImpl implements MLServiceClient {
         JsonNode fullJson = objectMapper.readTree(responseString.toString());
         JsonNode resultNode = fullJson.path("result");
         double confidence = resultNode.path("confidence").asDouble();
+        double CONFIDENCE_THRESHOLD = Double.parseDouble(mlConfig.get("ml.confidenceThreshold"));
         // Check if the confidence is above the threshold
         boolean resolvedAmbiguity = confidence >= CONFIDENCE_THRESHOLD;
         logger.info("ML model confidence: " + confidence + ". Resolved ambiguity: " + resolvedAmbiguity);

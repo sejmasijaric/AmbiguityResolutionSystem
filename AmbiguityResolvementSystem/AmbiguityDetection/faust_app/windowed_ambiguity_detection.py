@@ -5,27 +5,31 @@ import faust
 import xml.etree.ElementTree as ET
 import yaml
 from typing import Optional
+import sys
+import os
+# tells python to look one level up from the current file's directory
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from xes_to_json_mapper import parse_xml
 import asyncio
 import requests
 import logging
 
 # load configurations
-def load_config(path):
-    with open(path, "r") as f:
-        return yaml.safe_load(f)
+config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "adm-config.yaml")
+with open(config_path, "r") as file:
+    config = yaml.safe_load(file)
 
 # Reference: https://medium.com/@goldengrisha/mastering-windowing-in-faust-tumbling-hopping-and-sliding-explained-with-examples-31bf5d5a1bd4
 # adjusted code to my need
 # load config file
-config = load_config("../adm-config.yaml")
-app = faust.App('ambiguity_detection', broker=config ['ambiguity_detection']['kafka_broker'])
+app = faust.App('ambiguity_detection', broker=config['kafka_conf']['kafka_broker_faust'])
 
-TOPIC = config['ambiguity_detection']['topic']
+TOPIC = config['kafka_conf']['topic']
 
 buffer = []
 last_seen = 0
 timeout =3 # 1 second ambiguity window
+trigger_task = None
 
 @app.agent(TOPIC)
 async def process(event_stream):
@@ -36,11 +40,11 @@ async def process(event_stream):
         buffer.append(event.value)
         last_seen = time.time()
 
-        # if there is a task running when a new event occured cancel it --> ambiguity
+        # if there is a task running when a new event occured cancel it --> continuous event flow -->ambiguity
         if trigger_task is not None and not trigger_task.done():
             trigger_task.cancel()
 
-        # inactivity indicated that 
+        # inactivity indicate that 
         trigger_task = asyncio.create_task(trigger_on_inactivity())
 
 async def trigger_on_inactivity():
@@ -48,14 +52,14 @@ async def trigger_on_inactivity():
     if time.time() - last_seen >= timeout:
         if len(buffer)>1:
             logging.info(f"Ambiguity detected. Sending {len(buffer)} events to resolve the ambiguity...")
-            send_to_orchestrator("ambiguous-event", {"events", buffer})
+            send_to_orchestrator("ambiguous-event", {"events": buffer})
         elif len(buffer)==1:
             logging.info("Single event detected. Sending to publisher.")  
-            send_to_orchestrator("unambiguous-event", {"events", buffer[0]})
+            send_to_orchestrator("unambiguous-event", {"events": buffer[0]})
         buffer.clear()
 
 def send_to_orchestrator(endpoint, data):
-    url = f"http://localhost/orchestrate/{endpoint}"
+    url = f"http://localhost:8080/orchestrate/{endpoint}"
     try:
         response = requests.post(url, json=data)
         if response.status_code == 200:
@@ -64,7 +68,8 @@ def send_to_orchestrator(endpoint, data):
             logging.error(f"Failed to send to orchestrator with endpoint {endpoint}, Status {response.status_code}")
     except requests.exceptions.RequestException as e:
         logging.error(f"Error occurred when sending to orchestrator with {endpoint}: {str(e)}")
-
+    finally:
+        buffer.clear()
 
 if __name__=="__main__":
     app.main()

@@ -60,8 +60,10 @@ public class PublishingServiceClientImpl implements PublishingServiceClient {
             JsonNode rootMLOutput = objectMapper.readTree(mlOutput);
             String topClass = rootMLOutput.path("top_class").asText();
             boolean resolvedAmb = rootMLOutput.path("resolved_ambiguity").asBoolean();
-            String classConfidences = rootMLOutput.path("class_confidences").toString();
-            String framePaths = rootMLOutput.path("frames_paths").toString();
+            String classConfidences = rootMLOutput.path("all_class_probabilities").toString();
+            System.out.println("Class confidences: " + classConfidences);
+            String framePaths = rootMLOutput.path("frame_paths").toString();
+            System.out.println("Frame paths: " + framePaths);
 
             // get the list of ambiguous events
             JsonNode eventsRoot = objectMapper.readTree(ambiguousJsonEvents);

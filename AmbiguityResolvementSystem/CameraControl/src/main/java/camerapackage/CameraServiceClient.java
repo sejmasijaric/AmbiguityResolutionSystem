@@ -4,5 +4,5 @@ import java.util.List;
 
 public interface CameraServiceClient {
 
-    public List<String> captureFrames() throws Exception;
+    public List<String> getFrames() throws Exception;
 }
