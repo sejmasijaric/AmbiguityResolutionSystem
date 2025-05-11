@@ -2,19 +2,13 @@ package orchestrator.service;
 
 import camerapackage.CameraServiceClient;
 import mlpackage.MLServiceClient;
-import org.deckfour.xes.model.XEvent;
-import org.deckfour.xes.model.impl.XEventImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import publisherpackage.EventStreamListener;
-import ambiguitypackage.AmbiguityDetection;
-import camerapackage.CameraServiceClientImpl;
-import mlpackage.MLServiceClientImpl;
 import publisherpackage.PublishingServiceClient;
 
-
-import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /*
 This service does the following:
@@ -37,24 +31,38 @@ public class OrchestratorService {
         this.mlClient = mlClient;
         this.publishingClient = publishingClient;
     }
+
+    private static final Logger logger = LoggerFactory.getLogger(OrchestratorService.class);
     CameraServiceClient cameraClient;
     MLServiceClient mlClient;
     PublishingServiceClient publishingClient;
-    private final List<XEvent> receivedEvents = new ArrayList<>();
 
+    /**
+     * This method is called when ambiguity is detected by the AmbiguityDetection module via HTTP POST request
+     * It triggers the ambiguity resolution process
+     *
+     * @param json_events JSON string containing the ambiguous events
+     */
     public void resolveAmbiguityAndPublishEvent(String json_events) {
         try {
-            List<String> image_paths = cameraClient.captureFrames();
+            List<String> image_paths = cameraClient.getFrames();
             String mlOutput = mlClient.analyzeFrames(image_paths);
             // check if the camera output is empty
             if (mlOutput != null) {
-                System.out.println("ML output: " + mlOutput);
                 publishingClient.publishResolvedAmbiguousEvent(mlOutput, json_events);
             }
         } catch (Exception e) {
+            logger.error("Error while resolving ambiguity: " + e.getMessage());
             e.printStackTrace();
         }
     }
+
+    /**
+     * This method is called when ambiguity isn't detected by the AmbiguityDetection module
+     * It publishes the unambiguous event to the MQTT broker
+     *
+     * @param jsonEvent JSON string containing the unambiguous event
+     */
     public void publishUnambiguousEvent(String jsonEvent) {
         try {
             publishingClient.publishUnambiguousEvent(jsonEvent);

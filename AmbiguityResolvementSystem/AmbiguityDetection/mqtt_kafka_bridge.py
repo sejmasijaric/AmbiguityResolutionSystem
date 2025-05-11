@@ -89,7 +89,7 @@ def delivery_report(err, msg):
     if err is not None:
         logging.error("Event message delivery failed: ", err)
     else: 
-        logging.info("Event message delivered to ", msg.topic(), msg.partition())
+        logging.info("Event message delivered to topic: %s, partition: %s", msg.topic(), msg.partition())
 
 def run():
     client = connect_mqtt()

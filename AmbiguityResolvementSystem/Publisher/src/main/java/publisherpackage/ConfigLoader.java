@@ -18,6 +18,7 @@ public class ConfigLoader {
                 throw new RuntimeException("Unable to find configuration file: application.properties");
             }
             properties.load(input);
+            System.out.println("Loaded properties Publisher: " + properties);
         } catch (IOException ex) {
             throw new RuntimeException("Error loading configuration file: " + ex.getMessage(), ex);
         }
