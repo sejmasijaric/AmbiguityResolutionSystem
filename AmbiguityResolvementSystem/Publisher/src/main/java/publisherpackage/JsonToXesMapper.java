@@ -20,23 +20,6 @@ import java.util.Map;
 @Service
 public class JsonToXesMapper {
 
-    public static void main (String[] args) {
-        // Example usage
-        JsonToXesMapper mapper = new JsonToXesMapper();
-        String jsonMessage = "{"
-                + "\"concept:name\": \"EJUB\", "
-                + "\"time:timestamp\": \"2024-09-11T15:56:16.000+00:00\", "
-                + "\"perform:donor\": \"D001\", "
-                + "\"location:station\": \"Left station\""
-                + "}";
-        try {
-            String xesString = mapper.convertJsonToXes(jsonMessage);
-            System.out.println(xesString);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
     public String convertJsonToXes(String jsonEventString) throws ParserConfigurationException, TransformerException, JsonProcessingException {
         JsonNode jsonEvent = new ObjectMapper().readTree(jsonEventString);
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();

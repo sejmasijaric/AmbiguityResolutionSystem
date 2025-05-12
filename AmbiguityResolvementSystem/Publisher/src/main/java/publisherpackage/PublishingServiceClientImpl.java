@@ -6,20 +6,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.Getter;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.TransformerException;
-import java.lang.reflect.Array;
-import java.nio.charset.StandardCharsets;
-import java.util.Iterator;
-import java.util.Map;
 
 @Service
 public class PublishingServiceClientImpl implements PublishingServiceClient {
@@ -79,9 +72,9 @@ public class PublishingServiceClientImpl implements PublishingServiceClient {
         mqttService.publish(topicUnambiguousEvents, xesEvent);
     }
     private void handleUnresolvedAmbiguity(AmbiguityResolutionResult result, ArrayNode ambiguousEvents) throws MqttException {
-        logger.error("Confidence for classes: " + result.getClassConfidences());
-        logger.error("Ambiguity not resolved. Manual intervention needed for events: ");
-        ambiguousEvents.forEach(event -> logger.error(event.toString()));
+        logger.info("Confidence for classes: " + result.getClassConfidences());
+        logger.info("Ambiguity not resolved. Manual intervention needed for events: ");
+        ambiguousEvents.forEach(event -> logger.info(event.toString()));
         logger.info("Publishing to ambiguous events topic: " + topicAmbiguousEvents);
         mqttService.publish(topicAmbiguousEvents, ambiguousEvents.toString());
     }
@@ -110,10 +103,9 @@ public class PublishingServiceClientImpl implements PublishingServiceClient {
             // get the unambiguous event
             JsonNode root = objectMapper.readTree(unambEvent);
             JsonNode eventsNode = root.get("events");
-            String eventsAsString = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(eventsNode);
+            String eventsAsString = eventsNode.toString();
 
             // convert the JSON event to XES format
-            JsonToXesMapper jsonToXesMapper = new JsonToXesMapper();
             String xesEvent = jsonToXesMapper.convertJsonToXes(eventsAsString);
             logger.info("Publishing unambiguous event: " + xesEvent);
             mqttService.publish(topicUnambiguousEvents, xesEvent);

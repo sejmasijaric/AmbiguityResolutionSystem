@@ -27,6 +27,10 @@ public class ConfigLoader {
     }
 
     public String get(String key) {
-        return properties.getProperty(key);
+        String value = properties.getProperty(key);
+        if (value == null) {
+            throw new IllegalArgumentException("Missing config value for key: " + key);
+        }
+        return value;
     }
 }
