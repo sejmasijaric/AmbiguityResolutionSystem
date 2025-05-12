@@ -1,5 +1,6 @@
 package mlpackage;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -14,16 +15,39 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Service
+@Component
 public class MLServiceClientImpl implements MLServiceClient {
 
     private static final Logger logger = LoggerFactory.getLogger(MLServiceClientImpl.class);
     // load mlConfiguration
-    ConfigLoader mlConfig = new ConfigLoader();
+    private final ConfigLoader mlConfig;
+    private ObjectMapper objectMapper;
+
+    public MLServiceClientImpl() {
+        this.mlConfig = new ConfigLoader();
+        this.objectMapper = new ObjectMapper();
+    }
+
+    public MLServiceClientImpl(ConfigLoader mlConfig, ObjectMapper objectMapper) {
+        this.mlConfig = mlConfig;
+        this.objectMapper = objectMapper;
+    }
+
+    public static void main(String[] args) throws Exception {
+        MLServiceClient mlClient = new MLServiceClientImpl();
+        List<String> framePaths = List.of("/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0000.jpg",
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0009.jpg",
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0021.jpg",
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0027.jpg",
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered3_frame_0029.jpg",
+                "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/MachineLearning/ml_api/test-set/desinfection_left_cluttered6_frame_0025.jpg");
+        mlClient.analyzeFrames(framePaths);
+    }
 
     /**
      * This method sends a POST request with frame paths to the ML service to analyze the frames
@@ -44,16 +68,12 @@ public class MLServiceClientImpl implements MLServiceClient {
         connection.setDoOutput(true); // enables writing to request body
 
         // convert input list of frame paths to JSON and write to request body
-        ObjectMapper objectMapper = new ObjectMapper();
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("frame_paths", frame_paths);
-        String jsonInputString = objectMapper.writeValueAsString(payload);
+        String jsonInputString = buildRequestPayload(frame_paths);
         connection.getOutputStream().write(jsonInputString.getBytes());
         // get response code
         int responseCode = connection.getResponseCode();
         if (responseCode != HttpURLConnection.HTTP_OK) {
             logger.error("Failed to connect to the server. Response code: " + responseCode);
-            throw new IOException("Failed to connect to the server. Response code: " + responseCode);
         }
         logger.info("ML model successfully processed frames!");
         // read response
@@ -65,21 +85,27 @@ public class MLServiceClientImpl implements MLServiceClient {
         }
         response.close();
 
-        // parse the JSON response
-        // Reference: https://www.baeldung.com/jackson-object-mapper-tutorial
-        // used to convert JSON to Java objects
-        JsonNode fullJson = objectMapper.readTree(responseString.toString());
-        JsonNode resultNode = fullJson.path("result");
-        double confidence = resultNode.path("confidence").asDouble();
-        double CONFIDENCE_THRESHOLD = Double.parseDouble(mlConfig.get("ml.confidenceThreshold"));
-        // Check if the confidence is above the threshold
-        boolean resolvedAmbiguity = confidence >= CONFIDENCE_THRESHOLD;
-        logger.info("ML model confidence: " + confidence + ". Resolved ambiguity: " + resolvedAmbiguity);
-        // Construct final JSON output including boolean indicating whether the ambiguity was resolved
-        ObjectNode resultObject = (ObjectNode) resultNode;
-        resultObject.put("resolved_ambiguity", resolvedAmbiguity);
+        ObjectNode resultObject = parseResponseAndCheckConfidence(responseString.toString());
         String mlOutput = objectMapper.writeValueAsString(resultObject);
         logger.info("ML output: " + mlOutput);
         return mlOutput;
+    }
+
+    protected String buildRequestPayload(List<String> framePaths) throws JsonProcessingException {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("frame_paths", framePaths);
+        return objectMapper.writeValueAsString(payload);
+    }
+    protected ObjectNode parseResponseAndCheckConfidence(String responseBody) throws JsonProcessingException {
+        JsonNode fullJsonResponseBody = objectMapper.readTree(responseBody);
+        JsonNode resultNode = fullJsonResponseBody.path("result");
+
+        double confidence = resultNode.path("confidence").asDouble();
+        double CONFIDENCE_THRESHOLD = Double.parseDouble(mlConfig.get("ml.confidenceThreshold"));
+        boolean resolved = confidence >= CONFIDENCE_THRESHOLD;
+
+        ObjectNode resultObject = (ObjectNode) resultNode;
+        resultObject.put("resolved_ambiguity", resolved);
+        return resultObject;
     }
 }
