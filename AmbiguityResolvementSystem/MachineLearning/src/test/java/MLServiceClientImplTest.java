@@ -41,14 +41,14 @@ class MLServiceClientImplTest {
         String mockResponse = """
         {
           "result": {
-            "gesture": "injection",
+            "top_class": "injection",
             "confidence": 0.85
           }
         }
         """;
 
         ObjectNode result = client.parseResponseAndCheckConfidence(mockResponse);
-        assertEquals("injection", result.get("gesture").asText());
+        assertEquals("injection", result.get("top_class").asText());
         assertTrue(result.get("resolved_ambiguity").asBoolean());
     }
 
