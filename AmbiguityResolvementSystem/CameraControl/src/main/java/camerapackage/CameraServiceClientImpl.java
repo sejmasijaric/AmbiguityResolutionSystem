@@ -19,69 +19,84 @@ public class CameraServiceClientImpl implements CameraServiceClient {
 
 
     private static final Logger logger = LoggerFactory.getLogger(CameraServiceClientImpl.class);
-    CameraConfigLoader config = new CameraConfigLoader();
+    private final CameraConfigLoader cameraConfig;
+
+    public CameraServiceClientImpl() {
+        this.cameraConfig = new CameraConfigLoader();
+    }
+    public CameraServiceClientImpl(CameraConfigLoader config) {
+        this.cameraConfig = config;
+    }
 
     @Override
     public List<String> getFrames() throws Exception {
         startCamera();
         List<String> filepaths = new ArrayList<>();
         String filepath = captureFrame();
-        int numberOfFrames = Integer.parseInt(config.get("cameraControl.numberOfFrames"));
-        long waitingTime = Long.parseLong(config.get("cameraControl.waitingTime"));
+
+        // get configuration values
+        int numberOfFrames = Integer.parseInt(cameraConfig.get("cameraControl.numberOfFrames"));
+        long waitingTime = Long.parseLong(cameraConfig.get("cameraControl.waitingTime"));
         for (int i = 0; i < numberOfFrames; i++) {
-            if (filepath.equals("Could not capture frame")) {
+            if (filepath == null) {
                 continue;
             }
             filepaths.add(filepath);
             filepath = captureFrame();
-            try {
-                Thread.sleep(waitingTime); // Wait for 500 milliseconds
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // good practice: re-interrupt the thread
-                e.printStackTrace();
-            }
+            waitBeforeNextFrame(waitingTime);
         }
         stopCamera();
         return filepaths;
     }
 
+    private void waitBeforeNextFrame (long waitingTime) {
+        try {
+            Thread.sleep(waitingTime); // Wait for 500 milliseconds
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // re-interrupt the thread
+            logger.error("Thread interrupted while waiting for next frame: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
     private void startCamera() throws IOException, URISyntaxException {
         logger.info("Starting camera...");
-        String requestEndpoint = config.get("cameraControl.startCameraEndpoint");
+        String requestEndpoint = cameraConfig.get("cameraControl.startCameraEndpoint");
         sendGetRequest(requestEndpoint);
         logger.info("Camera started!");
     }
     private void stopCamera() throws IOException , URISyntaxException{
         logger.info("Stopping camera...");
-        String requestEndpoint = config.get("cameraControl.stopCameraEndpoint");
+        String requestEndpoint = cameraConfig.get("cameraControl.stopCameraEndpoint");
         sendGetRequest(requestEndpoint);
         logger.info("Camera stopped!");
     }
-    private String captureFrame() throws IOException, URISyntaxException, ParseException {
+    protected String captureFrame() throws IOException, URISyntaxException, ParseException {
         logger.info("Capturing frame...");
         // get frame filepath from response
-        String requestEndpoint = config.get("cameraControl.captureFrameEndpoint");
-        String response = sendGetRequest("/capture-frame");
-        JSONParser parser = new JSONParser();
-        JSONObject jsonObject = (JSONObject) parser.parse(response);
+        String requestEndpoint = cameraConfig.get("cameraControl.captureFrameEndpoint");
+        String response = sendGetRequest(requestEndpoint);
+        JSONObject jsonObject = parseJsonResponse(response);
         String status = jsonObject.get("status").toString();
-        if (status.equals("frame captured")) {
+        if (status.equals("successful")) {
             return jsonObject.get("filepath").toString();
         } else {
             logger.error("Failed to capture frame.");
-            return "Could not capture frame";
+            return null;
         }
+    }
+    protected JSONObject parseJsonResponse(String response) throws ParseException {
+        JSONParser parser = new JSONParser();
+        return (JSONObject) parser.parse(response);
     }
 
     // Helper method to send the frames
     // Reference: https://docs.oracle.com/javase/tutorial/networking/urls/connecting.html#:~:text=When%20you%20do%20this%20you,openConnection()%3B%20myURLConnection.
     // Since URL constructors are deprecated: https://stackoverflow.com/questions/75966165/how-to-replace-the-deprecated-url-constructors-in-java-20
     // reference used to establish connection
-    private String sendGetRequest(String request) throws IOException, URISyntaxException {
-        String baseUrl = config.get("cameraControl.baseUrl");
-        //String baseUrl = "http://localhost:8000";
+    protected String sendGetRequest(String request) throws IOException, URISyntaxException {
+        String baseUrl = cameraConfig.get("cameraControl.baseUrl");
         URI url = new URI(baseUrl + request);
-        System.out.println(url);
         HttpURLConnection connection = (HttpURLConnection) url.toURL().openConnection();
         connection.setRequestMethod("GET");
 

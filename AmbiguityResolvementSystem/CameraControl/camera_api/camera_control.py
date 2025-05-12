@@ -61,10 +61,10 @@ def capture_frame():
     ret, frame = camera.read()
     if not ret:
         logging.error("Failed to read frame from camera.")
-        return JSONResponse(status_code=500, content={"error": "Failed to read frame"})
+        return JSONResponse(status_code=500, content={"error": "Failed to read frame", "status": "failed"})
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-    filepath = f"{SAVE_DIR}/frame_{timestamp}.jpg"
+    filepath = os.path.abspath(os.path.join(SAVE_DIR, f"frame_{timestamp}.jpg"))
     cv2.imwrite(filepath, frame)
 
-    return {"status": "frame captured", "filepath": filepath}
+    return {"status": "successful", "filepath": filepath}
