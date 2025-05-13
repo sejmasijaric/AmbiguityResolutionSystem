@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 # Step 1: Create dummy config file before importing the module
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'adm-config.yaml')
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'adm-config-dummy.yaml')
 CONFIG_CONTENT = """
 mqtt_conf:
   server: "test.mosquitto.org"

@@ -18,6 +18,7 @@ def parse_xml(xml_event):
         logging.info("Converting XES to JSON")
         # parse xml string into element tree object:
         root = ET.fromstring(xml_event)
+        print("Root: ", root)
         # initialise json object
         json_event = {}
 

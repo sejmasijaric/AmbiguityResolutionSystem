@@ -31,6 +31,7 @@ public class CameraServiceClientImpl implements CameraServiceClient {
     @Override
     public List<String> getFrames() throws Exception {
         startCamera();
+        Thread.sleep(300);
         List<String> filepaths = new ArrayList<>();
         String filepath = captureFrame();
 
@@ -97,6 +98,7 @@ public class CameraServiceClientImpl implements CameraServiceClient {
     protected String sendGetRequest(String request) throws IOException, URISyntaxException {
         String baseUrl = cameraConfig.get("cameraControl.baseUrl");
         URI url = new URI(baseUrl + request);
+
         HttpURLConnection connection = (HttpURLConnection) url.toURL().openConnection();
         connection.setRequestMethod("GET");
 
