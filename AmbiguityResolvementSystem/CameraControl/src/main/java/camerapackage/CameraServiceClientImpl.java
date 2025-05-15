@@ -105,7 +105,8 @@ public class CameraServiceClientImpl implements CameraServiceClient {
         // check the response code
         int responseCode = connection.getResponseCode();
         if (responseCode != HttpURLConnection.HTTP_OK) {
-            throw new IOException("Failed to connect to the server. Response code: " + responseCode);
+            logger.error("Failed to connect to the server. Response code: " + responseCode);
+            return null;
         }
 
         // read the response
@@ -118,10 +119,5 @@ public class CameraServiceClientImpl implements CameraServiceClient {
         response.close();
 
         return responseString.toString();
-    }
-
-    public static void main(String[] args) throws Exception {
-        CameraServiceClientImpl cameraClient = new CameraServiceClientImpl();
-        cameraClient.getFrames();
     }
 }
