@@ -6,7 +6,10 @@ from xes_to_json_mapper import parse_xml
 import random
 from confluent_kafka import Producer
 import json
-
+import csv
+import os
+from datetime import datetime
+import uuid
 
 # resource: https://www.emqx.com/en/blog/how-to-use-mqtt-in-python
 # for connection to broker and subscription to topic
@@ -34,9 +37,19 @@ producer_conf = {
 }
 producer = Producer(producer_conf)
 
+LATENCY_CSV_PATH = "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/latency.csv"
+
+# Create CSV file with header if it doesn't exist
+if not os.path.exists(LATENCY_CSV_PATH):
+    with open(LATENCY_CSV_PATH, mode='w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["timestamp", "event_id", "latency_ms"])
+
+
 
 def connect_mqtt():
-    def on_connect(client, userdata, flags, rc, properties):
+    # deleted properties as last parameter
+    def on_connect(client, userdata, flags, rc, properties=None):
         if rc == 0:
             logging.info("Connected to MQTT Broker!")
         else:
@@ -50,7 +63,7 @@ def connect_mqtt():
     
     return client
 
-def on_disconnect(client, userdata, rc, properties=None):
+def on_disconnect(client, userdata, flags, rc, properties=None):
     logging.info("Disconnected with result code: %s", rc)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
     while reconnect_count < MAX_RECONNECT_COUNT:
@@ -71,14 +84,26 @@ def on_disconnect(client, userdata, rc, properties=None):
 
 def subscribe(client: mqtt_client):
     def on_message(client, userdata, msg):
+        start = datetime.utcnow()
         logging.info(f"Received `{msg.payload.decode()}` from `{msg.topic}` topic")
         try:
-            message = msg.payload
-            json_event = parse_xml(message) # this is a dictionary of the event (JSON format)
+            logging.info(f"Message payload: {msg.payload}")
+            logging.info(f"Message payload decode: {msg.payload.decode()}")
+            message = msg.payload.decode()
+            json_event = parse_xml(message) # this is a dictionary of the event (JSON format)
             if json_event is not None:
-                json_event_raw = json.dumps(json_event).encode('utf-8') # necessary because kafka expects a bytes-like object
+                # Generate a unique event_id if not present
+                event_id = str(uuid.uuid4())
+                json_event['event_id'] = event_id
+                # convert into json string
+                json_event_raw = json.dumps(json_event).encode('utf-8') # necessary because kafka expects a bytes-like object
                 producer.produce(KAFKA_TOPIC, value=json_event_raw, callback=delivery_report)
                 producer.flush()
+            latency = datetime.utcnow() - start
+            latency_ms = latency.total_seconds()*1000
+            with open(LATENCY_CSV_PATH, mode='a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow([datetime.utcnow().isoformat(), json_event.get('event_id', 'unknown'), "MqttKafkaBridging",latency_ms])
         except Exception as err:
             logging.error("Failed to send to Kafka", err)
 

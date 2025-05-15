@@ -14,9 +14,20 @@ from xes_to_json_mapper import parse_xml
 import asyncio
 import requests
 import logging
+import csv
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+# delete later:
+LATENCY_CSV_PATH = "/Users/sejmasijaric/Documents/Bachelor Thesis/AmbiguityResolvementSystem/latency.csv"
+
+# Create CSV file with header if it doesn't exist
+if not os.path.exists(LATENCY_CSV_PATH):
+    with open(LATENCY_CSV_PATH, mode='w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["timestamp", "component", "latency_ms"])
+
+
 
 # load configurations
 config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "adm-config.yaml")
@@ -37,27 +48,25 @@ trigger_task = None
 async def process(event_stream):
     global last_seen, buffer, trigger_task
     async for event in event_stream.events():
-        # event assumes a key-value pair, so we just take the value
+        start = datetime.utcnow()
         logging.info(f"Received: {event.value}")
-
-        try: 
-            # get event timestamp from the JSON
+        try:
             event_data = event.value
+            event_id = event_data.get('event_id', 'unknown')
             event_timestamp_str = event_data.get("time:timestamp")
             if event_timestamp_str is None:
                 logging.warning("No timestamp found in event, skipping")
                 continue
-
-            # parse timestamp to timestamp
             last_seen = time.time()
             buffer.append(event_data)
-
-            # cancel previous inactivity task
             if trigger_task is not None and not trigger_task.done():
                 trigger_task.cancel()
-
-            # inactivity indicates no event stream --> process buffer ((buffer.size>1) == ambiguity) 
             trigger_task = asyncio.create_task(trigger_on_inactivity())
+            latency = datetime.utcnow() - start
+            latency_ms = latency.total_seconds()*1000
+            with open(LATENCY_CSV_PATH, mode='a', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow([datetime.utcnow().isoformat(), event_id, "FaustAmbiguityDetection", latency_ms])
         except Exception as e:
             logging.error(f"Error processing event: {e}")
 
@@ -70,10 +79,10 @@ async def trigger_on_inactivity():
 def process_buffer():
     if len(buffer)>1:
         logging.info(f"Ambiguity detected. Sending {len(buffer)} events to orchestrator to resolve the ambiguity...")
-        send_to_orchestrator("ambiguous-event", {"events": buffer})
+        send_to_orchestrator("ambiguous-event", {"events": buffer, "event_id": buffer[0].get('event_id', 'unknown')})
     elif len(buffer)==1:
-        logging.info("No ambiguity detected. Sending to publisher.")  
-        send_to_orchestrator("unambiguous-event", {"events": buffer[0]})
+        logging.info("No ambiguity detected. Sending to publisher.")
+        send_to_orchestrator("unambiguous-event", {"events": buffer[0], "event_id": buffer[0].get('event_id', 'unknown')})
     buffer.clear()
 
 def send_to_orchestrator(endpoint, data):
