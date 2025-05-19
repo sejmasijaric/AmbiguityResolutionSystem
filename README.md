@@ -96,7 +96,7 @@ cd AmbiguityResolvementSystem/AmbiguityDetection/faust_app
 faust -A windowed_ambiguity_detection worker -l info
 ```
 
-Finally, start the Spring Boot application through the Java Orchestrator.
+Finally, start the Spring Boot application in the Java Orchestrator module
 
 ## Testing
 Unit and integration tests are implemented using:
