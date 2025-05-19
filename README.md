@@ -36,7 +36,7 @@ The system performs the following steps:
 
 ```bash 
 git clone https://github.com/sejmasijaric/AmbiguityResolutionSystem.git 
-cd AmbiguityResolutionSystem
+cd AmbiguityResolvementSystem/AmbiguityResolutionSystem
 ```
 
 #### 2. Requirements
@@ -55,15 +55,17 @@ docker compose up
 ```
 
 #### 4. Set up Python environments
+Create 2 virtual environments for the two python versions at project root
 ```bash
-# Create 2 virtual environments for the two python versions at project root
-python -m venv venv313
+python3 -m venv venv313
 source venv313/bin/activate
 pip install -r requirements.txt
-
-python -m venv venv39
+```
+Open a new terminal and run:
+``` bash
+python3.9 -m venv venv39
 source venv39/bin/activate
-cd DmbiguityDetection/faust_app
+cd AmbiguityResolvementSystem/AmbiguityDetection/faust_app
 pip install -r requirements_faust.txt
 ```
 #### 2. Run the Services and Bridge
@@ -72,21 +74,28 @@ pip install -r requirements_faust.txt
 For the Camera Control server:
 ```bash
 source venv313/bin/activate
-cd CameraControl/camera_api
-uvicorn camera_control:app --host 0.0.0.0. --port 8000
+cd AmbiguityResolvementSystem/CameraControl/camera_api
+uvicorn camera_control:app --host 0.0.0.0 --port 8000
 ```
 For the Machine Learning server:
 ```bash
 source venv313/bin/activate
-cd MachineLearning/ml_api
-uvicorn ml_api:service --host 0.0.0.0. --port 8001
+cd AmbiguityResolvementSystem/MachineLearning/ml_api
+uvicorn ml_api:service --host 0.0.0.0 --port 8001
 ```
 For the MQTT-Kafka bridge:
 ```
 source venv313/bin/activate
-cd AmbiguityDetection
+cd AmbiguityResolvementSystem/AmbiguityDetection
 python3 mqtt_kafka_bridge.py
 ```
+For the Faust application:
+```
+source venv39/bin/activate
+cd AmbiguityResolvementSystem/AmbiguityDetection/faust_app
+faust -A windowed_ambiguity_detection worker -l info
+```
+
 Finally, start the Spring Boot application through the Java Orchestrator.
 
 ## Testing
@@ -96,10 +105,10 @@ Unit and integration tests are implemented using:
 - JUnit 5 and Mockito (Java)
 
 ## Modules
-Each module has a single responsibility, communicating via REST APIs or MQTT topics. This ensures modularity and fault tolerance.
+Each module has a single responsibility, communicating via REST APIs or interfaces. This ensures modularity and minimizes coupling.
 
 ## Future work
 - Integrate a UI for manual ambiguity resolution
 - Support concurrent activity detection
 - Optimize image capturing and processing latency
-- Expand ML model to more activity classes
+- Expand ML model to more activity class labels
