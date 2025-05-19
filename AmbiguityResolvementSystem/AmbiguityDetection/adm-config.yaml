@@ -1,0 +1,13 @@
+mqtt_conf:
+  server: "broker.emqx.io"
+  tcp_port: 1883
+  topic: "topic-test"
+  FIRST_RECONNECT_DELAY: 1
+  RECONNECT_RATE: 2
+  MAX_RECONNECT_COUNT: 3
+  MAX_RECONNECT_DELAY: 4
+  
+kafka_conf:
+  kafka_broker_faust: "kafka://localhost:9092"
+  kafka_broker: "localhost:9092"
+  topic: "iot-events"
